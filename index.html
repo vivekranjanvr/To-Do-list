@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <link rel="stylesheet" href="server.js">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        form {
+            display: flex;
+            justify-content: space-between;
+        }
+        form input {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 16px;
+        }
+        form button {
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        form button:hover {
+            background-color: #218838;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background-color: #f9f9f9;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        li.completed {
+            text-decoration: line-through;
+            color: gray;
+        }
+        li button {
+            background: none;
+            border: none;
+            color: red;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        li button:hover {
+            color: darkred;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>To-Do List</h1>
+        <form id="todo-form">
+            <input type="text" id="new-task" placeholder="Enter a new task" required>
+            <button type="submit">Add Task</button>
+        </form>
+        <ul id="todo-list"></ul>
+    </div>
+
+    <script>
+        const form = document.getElementById('todo-form');
+        const taskInput = document.getElementById('new-task');
+        const todoList = document.getElementById('todo-list');
+
+        // Fetch tasks from the back-end on load
+        async function fetchTasks() {
+            const response = await fetch('/tasks');
+            const tasks = await response.json();
+            renderTasks(tasks);
+        }
+
+        // Function to render tasks on the screen
+        function renderTasks(tasks) {
+            todoList.innerHTML = '';
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.className = task.completed ? 'completed' : '';
+                li.innerHTML = `
+                    <span>${task.text}</span>
+                    <div>
+                        <button onclick="toggleTask(${index})">${task.completed ? 'Undo' : 'Complete'}</button>
+                        <button onclick="editTask(${index})">Edit</button>
+                        <button onclick="deleteTask(${index})">Delete</button>
+                    </div>
+                `;
+                todoList.appendChild(li);
+            });
+        }
+
+        // Add a new task
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const taskText = taskInput.value.trim();
+            if (taskText) {
+                const task = { text: taskText, completed: false };
+                await fetch('/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(task)
+                });
+                taskInput.value = '';
+                fetchTasks();
+            }
+        });
+
+        // Toggle task completion status
+        async function toggleTask(index) {
+            const response = await fetch(`/tasks/${index}`);
+            const task = await response.json();
+            task.completed = !task.completed;
+            await fetch(`/tasks/${index}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(task)
+            });
+            fetchTasks();
+        }
+
+        // Edit an existing task
+        async function editTask(index) {
+            const newTask = prompt('Edit task:');
+            if (newTask) {
+                const task = await fetch(`/tasks/${index}`).then(res => res.json());
+                task.text = newTask;
+                await fetch(`/tasks/${index}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(task)
+                });
+                fetchTasks();
+            }
+        }
+
+        // Delete a task
+        async function deleteTask(index) {
+            await fetch(`/tasks/${index}`, { method: 'DELETE' });
+            fetchTasks();
+        }
+
+        // Load tasks on page load
+        window.onload = fetchTasks;
+    </script>
+</body>
+</html>
